@@ -1,0 +1,36 @@
+name: Daily opportunity scan
+
+on:
+  schedule:
+    - cron: "30 0 * * *"   # 06:00 IST every day
+    - cron: "30 12 * * *"  # 18:00 IST every day
+  workflow_dispatch:        # the "Run workflow" button on GitHub
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Collect
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLIST_USERNAME: ${{ secrets.CLIST_USERNAME }}
+          CLIST_API_KEY: ${{ secrets.CLIST_API_KEY }}
+        run: python -m tracker.main
+      - name: Save results to the repo
+        run: |
+          git config user.name "opportunity-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add opportunities.xlsx data/opportunities.db
+          git commit -m "Daily scan $(date -u +%F_%H%M)" || echo "nothing new"
+          git push
